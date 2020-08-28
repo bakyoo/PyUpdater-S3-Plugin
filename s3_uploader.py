@@ -48,11 +48,17 @@ class S3Uploader(BaseUploader):
 
     def init_config(self, config):
         self.access_key = os.environ.get(u'PYU_AWS_ID')
+        access_key = config.get(u'access_key')
+        if access_key is not None:
+            self.access_key = access_key
         if self.access_key is None:
             raise UploaderError('Missing PYU_AWS_ID',
                                 expected=True)
 
         self.secret_key = os.environ.get(u'PYU_AWS_SECRET')
+        secret_key = config.get(u'secret_key')
+        if secret_key is not None:
+            self.secret_key = secret_key
         if self.secret_key is None:
             raise UploaderError(u'Missing PYU_AWS_SECRET',
                                 expected=True)
@@ -102,6 +108,15 @@ class S3Uploader(BaseUploader):
         if self.bucket_region is None:
             self.bucket_region = 'us-west-2'
 
+        # Try to get endpoint url
+        self.endpoint_url = os.environ.get(u'PYU_AWS_ENDPOINT_URL')
+        endpoint_url = config.get(u'endpoint_url')
+
+        # If there is a endpoint url in the repo config we
+        # override the env var
+        if endpoint_url is not None:
+            self.endpoint_url = endpoint_url
+
         self._connect()
 
     def _connect(self):
@@ -111,9 +126,23 @@ class S3Uploader(BaseUploader):
             aws_session_token=self.session_token,
             region_name=self.bucket_region
         )
-        self.s3 = session.client('s3')
+        self.s3 = session.client('s3', endpoint_url=self.endpoint_url)
 
     def set_config(self, config):
+        access_key = config.get('access_key')
+        access_key = self.get_answer(
+            'Please enter your AWS S3 access key',
+            default=access_key
+        )
+        config['access_key'] = access_key
+
+        secret_key = config.get('secret_key')
+        secret_key = self.get_answer(
+            'Please enter your AWS S3 secret key',
+            default=secret_key
+        )
+        config['secret_key'] = secret_key
+
         bucket_name = config.get('bucket_name')
         bucket_name = self.get_answer(
             'Please enter a bucket name',
@@ -134,6 +163,13 @@ class S3Uploader(BaseUploader):
             default=bucket_region
         )
         config['bucket_region'] = bucket_region
+
+        endpoint_url = config.get('endpoint_url')
+        endpoint_url = self.get_answer(
+            'Please enter the endpoint url',
+            default=endpoint_url
+        )
+        config['endpoint_url'] = endpoint_url
 
     def upload_file(self, filename):
         """Uploads a single file to S3
